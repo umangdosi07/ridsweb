@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { ngoInfo } from '../../data/mock';
 import { toast } from 'sonner';
+import { authAPI } from '../../services/api';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -26,19 +27,18 @@ const AdminLogin = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock login - will be replaced with actual API
-    setTimeout(() => {
-      if (credentials.email && credentials.password) {
-        // Store mock token
-        localStorage.setItem('admin_token', 'mock_token_12345');
-        localStorage.setItem('admin_user', JSON.stringify({ email: credentials.email, name: 'Admin' }));
-        toast.success('Login successful!');
-        navigate('/admin/dashboard');
-      } else {
-        toast.error('Please enter valid credentials');
-      }
+    try {
+      const response = await authAPI.login(credentials.email, credentials.password);
+      localStorage.setItem('admin_token', response.access_token);
+      localStorage.setItem('admin_user', JSON.stringify({ email: credentials.email }));
+      toast.success('Login successful!');
+      navigate('/admin/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.detail || 'Invalid email or password');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
