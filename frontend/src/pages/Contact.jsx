@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { ngoInfo } from '../data/mock';
 import { toast } from 'sonner';
+import { inquiriesAPI } from '../services/api';
 
 const Contact = () => {
   const [contactForm, setContactForm] = useState({
@@ -32,8 +33,8 @@ const Contact = () => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Mock submission - will be replaced with actual API call
-    setTimeout(() => {
+    try {
+      await inquiriesAPI.create(contactForm);
       toast.success('Thank you for your message! We will get back to you soon.');
       setContactForm({
         name: '',
@@ -42,8 +43,12 @@ const Contact = () => {
         subject: '',
         message: ''
       });
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast.error('Failed to submit. Please try again.');
+    } finally {
       setIsSubmitting(false);
-    }, 1500);
+    }
   };
 
   return (
