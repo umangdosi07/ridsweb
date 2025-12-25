@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { donationTiers, ngoInfo } from '../data/mock';
 import { toast } from 'sonner';
+import { donationsAPI } from '../services/api';
 
 const Donate = () => {
   const [donationType, setDonationType] = useState('one-time');
@@ -63,11 +64,27 @@ const Donate = () => {
 
     setIsProcessing(true);
 
-    // Mock payment processing - will be replaced with Razorpay
-    setTimeout(() => {
-      toast.success('Thank you for your generous donation! (Payment gateway integration pending)');
+    try {
+      const donationData = {
+        ...donorInfo,
+        amount: selectedAmount,
+        type: donationType
+      };
+      
+      const result = await donationsAPI.createOrder(donationData);
+      toast.success('Donation recorded! Payment gateway integration pending. Thank you for your generosity!');
+      console.log('Order created:', result);
+      
+      // Reset form
+      setDonorInfo({ name: '', email: '', phone: '', pan: '', address: '' });
+      setSelectedAmount(1000);
+      setCustomAmount('');
+    } catch (error) {
+      console.error('Error processing donation:', error);
+      toast.error('Failed to process donation. Please try again.');
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const impactIcons = [
