@@ -138,7 +138,9 @@ const AdminLogin = () => {
         {/* Demo Credentials Notice */}
         <div className="mt-6 p-4 bg-white/10 backdrop-blur-sm rounded-xl">
           <p className="text-white/80 text-sm text-center">
-            <span className="font-medium">Demo:</span> Enter any email and password to access the dashboard
+            <span className="font-medium">Default Login:</span><br />
+            Email: admin@rids.org<br />
+            Password: admin123
           </p>
         </div>
       </div>
