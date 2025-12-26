@@ -201,11 +201,14 @@ backend:
     file: "/app/backend/routers/newsletter.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "POST /api/newsletter tested successfully"
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Newsletter subscription API working perfectly. Successfully subscribed email with proper ID generation and response structure."
 
   - task: "Donations API (Mock Razorpay)"
     implemented: true
