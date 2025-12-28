@@ -60,6 +60,7 @@ api_router.include_router(volunteers_router)
 api_router.include_router(newsletter_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(seed_router)
+api_router.include_router(users_router)
 
 # Include the router in the main app
 app.include_router(api_router)
