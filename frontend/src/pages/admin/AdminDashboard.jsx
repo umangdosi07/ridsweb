@@ -470,6 +470,180 @@ const AdminDashboard = () => {
           </div>
         );
 
+      case 'users':
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-heading font-bold text-stone-800">User Management</h2>
+              <Button 
+                className="bg-terracotta-600 hover:bg-terracotta-700 text-white"
+                onClick={() => setShowCreateUserModal(true)}
+              >
+                <Plus className="mr-2" size={18} />
+                Add New User
+              </Button>
+            </div>
+            
+            {/* Create User Modal */}
+            {showCreateUserModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <Card className="w-full max-w-md mx-4 border-0 shadow-2xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserPlus size={20} />
+                      Create New Admin User
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="userName">Full Name *</Label>
+                        <Input
+                          id="userName"
+                          value={newUser.name}
+                          onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                          placeholder="Enter full name"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="userEmail">Email Address *</Label>
+                        <Input
+                          id="userEmail"
+                          type="email"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                          placeholder="Enter email address"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="userPassword">Password *</Label>
+                        <Input
+                          id="userPassword"
+                          type="password"
+                          value={newUser.password}
+                          onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                          placeholder="Enter password"
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => {
+                            setShowCreateUserModal(false);
+                            setNewUser({ name: '', email: '', password: '' });
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 text-white"
+                          disabled={creatingUser}
+                        >
+                          {creatingUser ? 'Creating...' : 'Create User'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Users List */}
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-0">
+                {loadingUsers ? (
+                  <div className="p-8 text-center text-stone-500">Loading users...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-stone-50 border-b border-stone-100">
+                        <tr>
+                          <th className="text-left p-4 font-medium text-stone-600">User</th>
+                          <th className="text-left p-4 font-medium text-stone-600">Email</th>
+                          <th className="text-left p-4 font-medium text-stone-600">Role</th>
+                          <th className="text-left p-4 font-medium text-stone-600">Created</th>
+                          <th className="text-left p-4 font-medium text-stone-600">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-stone-500">
+                              No users found. Click "Add New User" to create one.
+                            </td>
+                          </tr>
+                        ) : (
+                          adminUsers.map((adminUser) => (
+                            <tr key={adminUser.id} className="border-b border-stone-50 hover:bg-stone-50">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-terracotta-100 flex items-center justify-center">
+                                    <span className="text-terracotta-600 font-medium">
+                                      {adminUser.name?.charAt(0).toUpperCase() || 'A'}
+                                    </span>
+                                  </div>
+                                  <span className="font-medium text-stone-800">{adminUser.name}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-stone-600">{adminUser.email}</td>
+                              <td className="p-4">
+                                <span className="px-3 py-1 bg-sage-100 text-sage-700 rounded-full text-sm flex items-center gap-1 w-fit">
+                                  <Shield size={12} />
+                                  {adminUser.role}
+                                </span>
+                              </td>
+                              <td className="p-4 text-stone-500 text-sm">
+                                {adminUser.created_at ? new Date(adminUser.created_at).toLocaleDateString() : '-'}
+                              </td>
+                              <td className="p-4">
+                                <div className="flex gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => handleDeleteUser(adminUser.id, adminUser.email)}
+                                    title="Delete user"
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Info Card */}
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-stone-50 to-sage-50">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-sage-100 flex items-center justify-center flex-shrink-0">
+                    <Shield className="text-sage-600" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-stone-800 mb-1">Admin Access</h3>
+                    <p className="text-stone-600 text-sm">
+                      All admin users have full access to manage content, view donations, handle inquiries, 
+                      and manage volunteer applications. Be careful when granting admin access.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
       case 'settings':
         return (
           <div className="space-y-6">
