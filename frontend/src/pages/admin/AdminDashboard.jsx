@@ -148,17 +148,8 @@ const AdminDashboard = () => {
   ];
 
   const recentDonations = recentActivity?.donations || [];
-    { id: 1, name: 'Rajesh Kumar', amount: 5000, date: '2025-08-04', status: 'completed' },
-    { id: 2, name: 'Priya Sharma', amount: 2500, date: '2025-08-03', status: 'completed' },
-    { id: 3, name: 'Anonymous', amount: 10000, date: '2025-08-02', status: 'completed' },
-    { id: 4, name: 'Amit Patel', amount: 1000, date: '2025-08-01', status: 'pending' },
-  ];
 
-  const recentInquiries = [
-    { id: 1, name: 'Sunita Devi', subject: 'Volunteering', date: '2025-08-04', status: 'new' },
-    { id: 2, name: 'Rahul Meena', subject: 'Partnership', date: '2025-08-03', status: 'replied' },
-    { id: 3, name: 'NGO Connect', subject: 'Collaboration', date: '2025-08-02', status: 'new' },
-  ];
+  const recentInquiries = recentActivity?.inquiries || [];
 
   const renderContent = () => {
     switch (activeTab) {
