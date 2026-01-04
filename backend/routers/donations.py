@@ -1,7 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import List
 import os
+import razorpay
+import hmac
+import hashlib
 
 from models import Donation, DonationCreate
 from auth import get_current_user
@@ -12,6 +15,14 @@ router = APIRouter(prefix="/donations", tags=["Donations"])
 mongo_url = os.environ.get('MONGO_URL')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'rids_ngo')]
+
+# Razorpay client
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+
+razorpay_client = None
+if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 @router.get("", response_model=List[Donation])
 async def get_donations(
@@ -57,28 +68,154 @@ async def create_donation(donation: DonationCreate):
     donation_dict = donation_obj.dict()
     
     # For now, mark as pending until payment is processed
-    # In real implementation, this would integrate with Razorpay
     donation_dict["status"] = "pending"
     
     await db.donations.insert_one(donation_dict)
     return donation_obj
 
+@router.post("/create-order")
+async def create_razorpay_order(donation: DonationCreate):
+    """Create a Razorpay order for payment."""
+    
+    if not razorpay_client:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment gateway not configured"
+        )
+    
+    # Create donation record
+    donation_obj = Donation(**donation.dict())
+    donation_dict = donation_obj.dict()
+    donation_dict["status"] = "pending"
+    await db.donations.insert_one(donation_dict)
+    
+    try:
+        # Create Razorpay order (amount in paise)
+        order_data = {
+            "amount": int(donation.amount * 100),  # Convert to paise
+            "currency": "INR",
+            "receipt": donation_obj.id,
+            "payment_capture": 1,  # Auto capture
+            "notes": {
+                "donor_name": donation.name,
+                "donor_email": donation.email,
+                "donor_phone": donation.phone,
+                "donation_type": donation.type,
+                "donation_id": donation_obj.id
+            }
+        }
+        
+        razorpay_order = razorpay_client.order.create(data=order_data)
+        
+        # Update donation with order ID
+        await db.donations.update_one(
+            {"id": donation_obj.id},
+            {"$set": {"razorpay_order_id": razorpay_order["id"]}}
+        )
+        
+        return {
+            "order_id": razorpay_order["id"],
+            "donation_id": donation_obj.id,
+            "amount": donation.amount,
+            "amount_paise": razorpay_order["amount"],
+            "currency": razorpay_order["currency"],
+            "key_id": RAZORPAY_KEY_ID,
+            "status": "created",
+            "donor": {
+                "name": donation.name,
+                "email": donation.email,
+                "phone": donation.phone
+            }
+        }
+        
+    except Exception as e:
+        # Update donation status to failed
+        await db.donations.update_one(
+            {"id": donation_obj.id},
+            {"$set": {"status": "failed", "error": str(e)}}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create payment order: {str(e)}"
+        )
+
+@router.post("/verify-payment")
+async def verify_payment(
+    razorpay_order_id: str,
+    razorpay_payment_id: str,
+    razorpay_signature: str,
+    donation_id: str
+):
+    """Verify Razorpay payment and update donation status."""
+    
+    if not razorpay_client:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment gateway not configured"
+        )
+    
+    try:
+        # Verify signature
+        params_dict = {
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+        
+        # Verify signature using Razorpay SDK
+        razorpay_client.utility.verify_payment_signature(params_dict)
+        
+        # Payment verified successfully - update donation status
+        await db.donations.update_one(
+            {"id": donation_id},
+            {
+                "$set": {
+                    "status": "completed",
+                    "payment_id": razorpay_payment_id,
+                    "razorpay_signature": razorpay_signature
+                }
+            }
+        )
+        
+        return {
+            "status": "success",
+            "message": "Payment verified successfully",
+            "donation_id": donation_id,
+            "payment_id": razorpay_payment_id
+        }
+        
+    except razorpay.errors.SignatureVerificationError:
+        # Signature verification failed
+        await db.donations.update_one(
+            {"id": donation_id},
+            {"$set": {"status": "failed", "error": "Signature verification failed"}}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment verification failed"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment verification error: {str(e)}"
+        )
+
 @router.put("/{donation_id}/status")
 async def update_donation_status(
     donation_id: str,
-    status: str,
+    new_status: str,
     payment_id: str = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Update donation status (admin only or via webhook)."""
     valid_statuses = ["pending", "completed", "failed"]
-    if status not in valid_statuses:
+    if new_status not in valid_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {valid_statuses}"
         )
     
-    update_data = {"status": status}
+    update_data = {"status": new_status}
     if payment_id:
         update_data["payment_id"] = payment_id
     
@@ -95,35 +232,43 @@ async def update_donation_status(
     
     return {"message": "Donation status updated successfully"}
 
-# Placeholder for Razorpay integration
-@router.post("/create-order")
-async def create_razorpay_order(donation: DonationCreate):
-    """Create a Razorpay order for payment.
-    
-    This endpoint will be fully implemented when Razorpay keys are provided.
-    For now, it creates a mock order.
-    """
-    # Create donation record
-    donation_obj = Donation(**donation.dict())
-    donation_dict = donation_obj.dict()
-    await db.donations.insert_one(donation_dict)
-    
-    # Mock order response
-    # In real implementation, this would call Razorpay API
-    return {
-        "order_id": f"order_mock_{donation_obj.id[:8]}",
-        "donation_id": donation_obj.id,
-        "amount": donation.amount,
-        "currency": "INR",
-        "status": "created",
-        "note": "Razorpay integration pending. This is a mock order."
-    }
-
 @router.post("/webhook")
-async def razorpay_webhook(payload: dict):
-    """Handle Razorpay webhook for payment confirmation.
+async def razorpay_webhook(request: Request):
+    """Handle Razorpay webhook for payment events."""
     
-    This endpoint will be fully implemented when Razorpay keys are provided.
-    """
-    # In real implementation, verify webhook signature and update donation status
-    return {"status": "received", "note": "Webhook handler ready for Razorpay integration"}
+    if not razorpay_client:
+        return {"status": "ignored", "reason": "Payment gateway not configured"}
+    
+    try:
+        payload = await request.json()
+        event = payload.get("event")
+        
+        if event == "payment.captured":
+            payment = payload.get("payload", {}).get("payment", {}).get("entity", {})
+            order_id = payment.get("order_id")
+            payment_id = payment.get("id")
+            
+            # Find and update donation by order ID
+            await db.donations.update_one(
+                {"razorpay_order_id": order_id},
+                {
+                    "$set": {
+                        "status": "completed",
+                        "payment_id": payment_id
+                    }
+                }
+            )
+            
+        elif event == "payment.failed":
+            payment = payload.get("payload", {}).get("payment", {}).get("entity", {})
+            order_id = payment.get("order_id")
+            
+            await db.donations.update_one(
+                {"razorpay_order_id": order_id},
+                {"$set": {"status": "failed"}}
+            )
+        
+        return {"status": "processed", "event": event}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
