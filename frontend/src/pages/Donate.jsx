@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Shield, CheckCircle, ArrowRight, Gift, Users, GraduationCap, Stethoscope, Info, Lock } from 'lucide-react';
+import { Heart, Shield, CheckCircle, ArrowRight, Gift, Users, GraduationCap, Stethoscope, Info, Lock, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { donationTiers, ngoInfo } from '../data/mock';
 import { toast } from 'sonner';
 import { donationsAPI } from '../services/api';
+
+const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID;
 
 const Donate = () => {
   const [donationType, setDonationType] = useState('one-time');
@@ -23,6 +25,20 @@ const Donate = () => {
     address: ''
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => setRazorpayLoaded(true);
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const amounts = [500, 1000, 2500, 5000, 10000, 25000];
 
@@ -49,6 +65,23 @@ const Donate = () => {
     return tier ? tier.impact : 'Make a meaningful contribution';
   };
 
+  const verifyPayment = async (response, donationId) => {
+    try {
+      const verifyData = {
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+        donation_id: donationId
+      };
+      
+      const result = await donationsAPI.verifyPayment(verifyData);
+      return result;
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      throw error;
+    }
+  };
+
   const handleDonate = async (e) => {
     e.preventDefault();
     
@@ -62,6 +95,11 @@ const Donate = () => {
       return;
     }
 
+    if (!razorpayLoaded) {
+      toast.error('Payment gateway is loading. Please try again.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -71,21 +109,104 @@ const Donate = () => {
         type: donationType
       };
       
-      const result = await donationsAPI.createOrder(donationData);
-      toast.success('Donation recorded! Payment gateway integration pending. Thank you for your generosity!');
-      console.log('Order created:', result);
+      // Create order via backend
+      const orderResult = await donationsAPI.createOrder(donationData);
+      console.log('Order created:', orderResult);
       
-      // Reset form
-      setDonorInfo({ name: '', email: '', phone: '', pan: '', address: '' });
-      setSelectedAmount(1000);
-      setCustomAmount('');
+      // Configure Razorpay options
+      const options = {
+        key: orderResult.key_id || RAZORPAY_KEY_ID,
+        amount: orderResult.amount_paise,
+        currency: orderResult.currency || 'INR',
+        name: 'RIDS - Rajasthan Integrated Development Society',
+        description: `Donation - ${donationType === 'monthly' ? 'Monthly' : 'One-time'}`,
+        order_id: orderResult.order_id,
+        handler: async function (response) {
+          console.log('Payment successful:', response);
+          try {
+            await verifyPayment(response, orderResult.donation_id);
+            setPaymentSuccess(true);
+            toast.success('Thank you for your generous donation! 🙏');
+            // Reset form
+            setDonorInfo({ name: '', email: '', phone: '', pan: '', address: '' });
+            setSelectedAmount(1000);
+            setCustomAmount('');
+          } catch (error) {
+            toast.error('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: orderResult.donor?.name || donorInfo.name,
+          email: orderResult.donor?.email || donorInfo.email,
+          contact: orderResult.donor?.phone || donorInfo.phone
+        },
+        notes: {
+          donor_name: donorInfo.name,
+          donation_type: donationType,
+          pan: donorInfo.pan || ''
+        },
+        theme: {
+          color: '#c87d4a'
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessing(false);
+            toast.info('Payment cancelled');
+          }
+        }
+      };
+
+      // Open Razorpay checkout
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function (response) {
+        console.error('Payment failed:', response.error);
+        toast.error(`Payment failed: ${response.error.description}`);
+        setIsProcessing(false);
+      });
+      razorpay.open();
+      
     } catch (error) {
       console.error('Error processing donation:', error);
-      toast.error('Failed to process donation. Please try again.');
-    } finally {
+      toast.error(error.response?.data?.detail || 'Failed to process donation. Please try again.');
       setIsProcessing(false);
     }
   };
+
+  // Success screen
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sage-50 to-ochre-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-0 shadow-2xl text-center">
+          <CardContent className="p-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-sage-100 flex items-center justify-center">
+              <CheckCircle2 className="text-sage-600" size={40} />
+            </div>
+            <h2 className="font-heading text-2xl font-bold text-stone-800 mb-2">
+              Thank You for Your Donation!
+            </h2>
+            <p className="text-stone-600 mb-6">
+              Your generous contribution will help transform lives in rural Rajasthan. 
+              A receipt has been sent to your email.
+            </p>
+            <div className="space-y-3">
+              <Link to="/">
+                <Button className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white">
+                  Back to Home
+                </Button>
+              </Link>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setPaymentSuccess(false)}
+              >
+                Make Another Donation
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const impactIcons = [
     { icon: <GraduationCap size={24} />, label: 'Education', amount: '₹500' },
