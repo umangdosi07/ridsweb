@@ -57,31 +57,57 @@ export const authAPI = {
 // ============ Programs API ============
 export const programsAPI = {
   getAll: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    const response = await apiClient.get(`/programs?${params}`);
-    return response.data;
+    try {
+      const params = new URLSearchParams(filters);
+      const response = await apiClient.get(`/programs?${params}`);
+      return response.data;
+    } catch (err) {
+      console.error("Programs API error:", err);
+      return []; // safe fallback
+    }
   },
-  
+
   getById: async (id) => {
-    const response = await apiClient.get(`/programs/${id}`);
-    return response.data;
+    try {
+      const response = await apiClient.get(`/programs/${id}`);
+      return response.data;
+    } catch (err) {
+      console.error(`Programs API getById(${id}) error:`, err);
+      return null; // safe fallback
+    }
   },
-  
+
   create: async (programData) => {
-    const response = await apiClient.post('/programs', programData);
-    return response.data;
+    try {
+      const response = await apiClient.post('/programs', programData);
+      return response.data;
+    } catch (err) {
+      console.error("Programs API create error:", err);
+      return null;
+    }
   },
-  
+
   update: async (id, programData) => {
-    const response = await apiClient.put(`/programs/${id}`, programData);
-    return response.data;
+    try {
+      const response = await apiClient.put(`/programs/${id}`, programData);
+      return response.data;
+    } catch (err) {
+      console.error("Programs API update error:", err);
+      return null;
+    }
   },
-  
+
   delete: async (id) => {
-    const response = await apiClient.delete(`/programs/${id}`);
-    return response.data;
+    try {
+      const response = await apiClient.delete(`/programs/${id}`);
+      return response.data;
+    } catch (err) {
+      console.error("Programs API delete error:", err);
+      return null;
+    }
   },
 };
+
 
 // ============ News API ============
 export const newsAPI = {
