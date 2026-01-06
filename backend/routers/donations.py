@@ -1,106 +1,114 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Request
+from fastapi import APIRouter, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorClient
-from typing import List
 import os
 import razorpay
 import logging
+from datetime import datetime
+from uuid import uuid4
 
-from models import Donation, DonationCreate
-from auth import get_current_user
+from models import DonationCreate
 
 router = APIRouter(prefix="/donations", tags=["Donations"])
 
-# Configure logging
+# ================== Logging ==================
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("donations")
 
-# Database connection
-mongo_url = os.environ.get('MONGO_URL')
-if not mongo_url:
-    logger.error("MONGO_URL not set in environment variables.")
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'rids_ngo')]
+# ================== Environment Variables ==================
+MONGO_URL = os.getenv("MONGO_URL")
+DB_NAME = os.getenv("DB_NAME", "rids_ngo")
 
-# Razorpay client
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+if not MONGO_URL:
+    raise RuntimeError("❌ MONGO_URL not set")
 
 if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-    logger.warning("Razorpay keys are not set. Payment gateway will not work.")
-    razorpay_client = None
-else:
-    razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    raise RuntimeError("❌ Razorpay keys not set")
 
-# ================== Endpoints ==================
+# ================== Database (Singleton) ==================
+mongo_client = AsyncIOMotorClient(MONGO_URL)
+db = mongo_client[DB_NAME]
 
-@router.post("/create-order")
+# ================== Razorpay Client ==================
+razorpay_client = razorpay.Client(
+    auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+)
+
+# ================== Routes ==================
+
+@router.post("/create-order", status_code=status.HTTP_201_CREATED)
 async def create_razorpay_order(donation: DonationCreate):
-    """Create a Razorpay order for payment."""
-    if not razorpay_client:
-        logger.error("Payment gateway not configured")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Payment gateway not configured"
-        )
+    """
+    Create Razorpay order and store donation in DB
+    """
 
-    # Create donation record
-    donation_obj = Donation(**donation.dict())
-    donation_dict = donation_obj.dict()
-    donation_dict["status"] = "pending"
+    donation_id = str(uuid4())
 
-    await db.donations.insert_one(donation_dict)
-    logger.info(f"Created donation record with ID: {donation_obj.id}")
+    donation_doc = {
+        "id": donation_id,
+        "name": donation.name,
+        "email": donation.email,
+        "phone": donation.phone,
+        "amount": donation.amount,
+        "type": donation.type,
+        "status": "pending",
+        "created_at": datetime.utcnow(),
+    }
 
     try:
+        # Save donation first
+        await db.donations.insert_one(donation_doc)
+        logger.info(f"Donation created: {donation_id}")
+
         # Create Razorpay order (amount in paise)
         amount_paise = int(donation.amount * 100)
-        order_data = {
+
+        razorpay_order = razorpay_client.order.create({
             "amount": amount_paise,
             "currency": "INR",
-            "receipt": donation_obj.id,
+            "receipt": donation_id,
             "payment_capture": 1,
             "notes": {
+                "donation_id": donation_id,
                 "donor_name": donation.name,
                 "donor_email": donation.email,
                 "donor_phone": donation.phone,
                 "donation_type": donation.type,
-                "donation_id": donation_obj.id
             }
-        }
-
-        logger.info(f"Creating Razorpay order for donation {donation_obj.id}")
-        razorpay_order = razorpay_client.order.create(data=order_data)
-        logger.info(f"Razorpay order created: {razorpay_order}")
+        })
 
         # Update donation with Razorpay order ID
         await db.donations.update_one(
-            {"id": donation_obj.id},
+            {"id": donation_id},
             {"$set": {"razorpay_order_id": razorpay_order["id"]}}
         )
 
         return {
+            "status": "created",
             "order_id": razorpay_order["id"],
-            "donation_id": donation_obj.id,
+            "donation_id": donation_id,
             "amount": donation.amount,
             "amount_paise": razorpay_order["amount"],
             "currency": razorpay_order["currency"],
-            "key_id": RAZORPAY_KEY_ID,
-            "status": "created",
+            "razorpay_key_id": RAZORPAY_KEY_ID,
             "donor": {
                 "name": donation.name,
                 "email": donation.email,
-                "phone": donation.phone
+                "phone": donation.phone,
             }
         }
 
     except Exception as e:
-        logger.error(f"Failed to create Razorpay order: {str(e)}", exc_info=True)
-        # Update donation status to failed
+        logger.exception("Razorpay order creation failed")
+
         await db.donations.update_one(
-            {"id": donation_obj.id},
+            {"id": donation_id},
             {"$set": {"status": "failed", "error": str(e)}}
         )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create payment order: {str(e)}"
+            detail="Failed to create Razorpay order"
         )
