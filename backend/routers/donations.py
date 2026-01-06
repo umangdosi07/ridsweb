@@ -1,5 +1,6 @@
+# backend/routers/donations.py
+
 from fastapi import APIRouter, HTTPException, status
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import razorpay
 import logging
@@ -7,42 +8,43 @@ from datetime import datetime
 from uuid import uuid4
 
 from models import DonationCreate
+from db import get_db   # ✅ use safe DB loader
 
 router = APIRouter(prefix="/donations", tags=["Donations"])
 
 # ================== Logging ==================
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("donations")
-
-# ================== Environment Variables ==================
-MONGO_URL = os.getenv("MONGO_URL")
-DB_NAME = os.getenv("DB_NAME", "rids_ngo")
-
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-
-if not MONGO_URL:
-    raise RuntimeError("❌ MONGO_URL not set")
-
-if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-    raise RuntimeError("❌ Razorpay keys not set")
-
-# ================== Database (Singleton) ==================
-mongo_client = AsyncIOMotorClient(MONGO_URL)
-db = mongo_client[DB_NAME]
-
-# ================== Razorpay Client ==================
-razorpay_client = razorpay.Client(
-    auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
-)
+logger.setLevel(logging.INFO)
 
 # ================== Routes ==================
+
+@router.get("/health")
+async def health_check():
+    """Health check to verify router loads correctly"""
+    return {"status": "donations router OK"}
 
 @router.post("/create-order", status_code=status.HTTP_201_CREATED)
 async def create_razorpay_order(donation: DonationCreate):
     """
     Create Razorpay order and store donation in DB
     """
+
+    # ✅ Validate env vars INSIDE request
+    RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+    RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Payment gateway not configured"
+        )
+
+    # ✅ Create Razorpay client safely
+    razorpay_client = razorpay.Client(
+        auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+    )
+
+    db = get_db()  # ✅ lazy MongoDB connection
 
     donation_id = str(uuid4())
 
