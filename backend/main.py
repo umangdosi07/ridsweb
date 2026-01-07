@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from routers.donations import router as donations_router
+from routers.auth import router as auth_router
 
 app = FastAPI()
 
@@ -8,5 +9,5 @@ app = FastAPI()
 def root():
     return {"status": "ok"}
 
-# add ONLY donations router
 app.include_router(donations_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
