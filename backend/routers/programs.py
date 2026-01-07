@@ -3,9 +3,7 @@ from typing import Optional
 
 from db import get_db
 
-# ----------------------------
-# CREATE ROUTER FIRST
-# ----------------------------
+# ✅ ROUTER MUST BE DEFINED FIRST
 router = APIRouter(prefix="/programs", tags=["Programs"])
 
 # ----------------------------
