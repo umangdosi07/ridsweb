@@ -30,7 +30,8 @@ async def get_programs(status: str = None, category: str = None):
         .to_list(100)
     )
 
-    return [Program(**program) for program in programs]
+    # return [Program(**program) for program in programs]
+return programs
 
 # ============================
 # GET SINGLE PROGRAM
