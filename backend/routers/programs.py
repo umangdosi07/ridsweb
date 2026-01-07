@@ -1,29 +1,32 @@
+from fastapi import APIRouter
+from typing import Optional
+
+from db import get_db
+
+# ----------------------------
+# CREATE ROUTER FIRST
+# ----------------------------
+router = APIRouter(prefix="/programs", tags=["Programs"])
+
+# ----------------------------
+# HEALTH CHECK (NO DB)
+# ----------------------------
+@router.get("/health")
+async def programs_health():
+    return {"status": "programs router alive"}
+
+# ----------------------------
+# MONGO CONNECTION TEST
+# ----------------------------
 @router.get("/mongo-test")
 async def mongo_test():
     db = get_db()
     await db.command("ping")
     return {"mongo": "connected"}
 
-
-from fastapi import APIRouter
-from typing import Optional
-
-from db import get_db
-
-router = APIRouter(prefix="/programs", tags=["Programs"])
-
-# ============================
-# HEALTH CHECK
-# ============================
-
-@router.get("/health")
-async def programs_health():
-    return {"status": "programs router alive"}
-
-# ============================
-# LIST PROGRAMS (SAFE VERSION)
-# ============================
-
+# ----------------------------
+# LIST PROGRAMS
+# ----------------------------
 @router.get("")
 async def get_programs(
     status: Optional[str] = None,
@@ -44,5 +47,4 @@ async def get_programs(
         .to_list(100)
     )
 
-    # Return raw MongoDB documents (TEMP, SAFE)
     return programs
