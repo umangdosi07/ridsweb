@@ -1,3 +1,10 @@
+@router.get("/mongo-test")
+async def mongo_test():
+    db = get_db()
+    await db.command("ping")
+    return {"mongo": "connected"}
+
+
 from fastapi import APIRouter
 from typing import Optional
 
