@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Heart, Shield, CheckCircle, ArrowRight, Gift, Users,
-  GraduationCap, Stethoscope, Info, Lock, CheckCircle2
+  Heart, Lock, CheckCircle2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { donationTiers, ngoInfo } from '../data/mock';
+import { donationTiers } from '../data/mock';
 import { toast } from 'sonner';
 import { donationsAPI } from '../services/api';
 
@@ -28,13 +27,24 @@ const Donate = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
-  /* ---------------- Razorpay Script ---------------- */
+  /* ---------------- LOAD RAZORPAY ---------------- */
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => setRazorpayLoaded(true);
+    script.async = true;
+    script.onload = () => {
+      console.log('✅ Razorpay SDK loaded');
+      setRazorpayLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('❌ Razorpay SDK failed to load');
+      toast.error('Failed to load payment gateway');
+    };
     document.body.appendChild(script);
-    return () => document.body.removeChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
   }, []);
 
   const amounts = [500, 1000, 2500, 5000, 10000, 25000];
@@ -55,14 +65,11 @@ const Donate = () => {
     if (value) setSelectedAmount(parseInt(value) || 0);
   };
 
-  const getImpactText = (amount) => {
-    const tier = donationTiers.find(t => t.amount <= amount);
-    return tier ? tier.impact : 'Make a meaningful contribution';
-  };
-
   /* ---------------- DONATE ---------------- */
   const handleDonate = async (e) => {
     e.preventDefault();
+
+    console.log('👉 Donate clicked');
 
     if (!donorInfo.name || !donorInfo.email || !donorInfo.phone) {
       toast.error('Please fill in all required fields');
@@ -74,25 +81,39 @@ const Donate = () => {
       return;
     }
 
-    if (!razorpayLoaded) {
-      toast.error('Payment gateway is loading. Please try again.');
+    if (!razorpayLoaded || !window.Razorpay) {
+      console.error('❌ Razorpay not available on window');
+      toast.error('Payment gateway not ready. Please refresh.');
       return;
     }
 
     setIsProcessing(true);
 
     try {
+      console.log('➡️ Creating order via backend…');
+
       const orderResult = await donationsAPI.createOrder({
         ...donorInfo,
         amount: selectedAmount,
         type: donationType
       });
 
-      console.log('Order created:', orderResult);
+      console.log('✅ Order response:', orderResult);
+
+      // HARD VALIDATION (prevents silent failure)
+      if (
+        !orderResult ||
+        !orderResult.order_id ||
+        !orderResult.razorpay_key_id ||
+        !orderResult.amount_paise
+      ) {
+        console.error('❌ Invalid order response:', orderResult);
+        throw new Error('Invalid payment order response');
+      }
 
       const options = {
-        key: orderResult.razorpay_key_id,      // ✅ FIXED
-        amount: orderResult.amount_paise,      // ✅ PAISA
+        key: orderResult.razorpay_key_id,
+        amount: orderResult.amount_paise,
         currency: orderResult.currency || 'INR',
         name: 'RIDS - Rajasthan Integrated Development Society',
         description: donationType === 'monthly'
@@ -101,13 +122,20 @@ const Donate = () => {
         order_id: orderResult.order_id,
 
         handler: function (response) {
-          console.log('Payment success:', response);
+          console.log('🎉 Payment success:', response);
           setPaymentSuccess(true);
           toast.success('Thank you for your generous donation! 🙏');
 
-          setDonorInfo({ name: '', email: '', phone: '', pan: '', address: '' });
+          setDonorInfo({
+            name: '',
+            email: '',
+            phone: '',
+            pan: '',
+            address: ''
+          });
           setSelectedAmount(1000);
           setCustomAmount('');
+          setIsProcessing(false);
         },
 
         prefill: {
@@ -120,23 +148,31 @@ const Donate = () => {
 
         modal: {
           ondismiss: () => {
+            console.warn('⚠️ Razorpay popup dismissed');
             setIsProcessing(false);
-            toast.info('Payment cancelled');
           }
         }
       };
 
+      console.log('🚀 Opening Razorpay checkout');
       const razorpay = new window.Razorpay(options);
+
       razorpay.on('payment.failed', function (response) {
-        console.error('Payment failed:', response.error);
-        toast.error(response.error.description || 'Payment failed');
+        console.error('❌ Payment failed:', response.error);
+        toast.error(response.error?.description || 'Payment failed');
         setIsProcessing(false);
       });
+
       razorpay.open();
 
     } catch (error) {
-      console.error('Donation error:', error);
-      toast.error('Failed to process donation. Please try again.');
+      console.error('❌ Donation error FULL:', error);
+      console.error('❌ Donation error RESPONSE:', error?.response);
+      toast.error(
+        error?.response?.data?.detail ||
+        error.message ||
+        'Failed to process donation. Please try again.'
+      );
       setIsProcessing(false);
     }
   };
@@ -161,14 +197,9 @@ const Donate = () => {
     );
   }
 
-  /* ---------------- UI (UNCHANGED) ---------------- */
+  /* ---------------- FORM ---------------- */
   return (
     <div className="min-h-screen bg-stone-50">
-      <section className="py-16 text-center bg-gradient-to-r from-terracotta-600 to-ochre-600 text-white">
-        <h1 className="text-4xl font-bold mb-2">Make a Donation</h1>
-        <p>Your support changes lives.</p>
-      </section>
-
       <section className="py-12 max-w-xl mx-auto px-4">
         <Card className="shadow-xl">
           <CardContent className="p-6">
