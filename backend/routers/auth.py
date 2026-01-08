@@ -122,3 +122,44 @@ async def setup_initial_admin():
         "password": "admin123",
         "note": "Please change the password after first login"
     }
+
+# ======================================================
+# TEMPORARY: CREATE FIRST ADMIN (REMOVE AFTER USE)
+# ======================================================
+from datetime import datetime
+from auth import get_password_hash
+from db import get_db
+
+@router.post("/_create-admin")
+async def _create_admin():
+    """
+    TEMPORARY endpoint to create first admin user.
+    REMOVE AFTER SUCCESSFUL LOGIN.
+    """
+    db = get_db()
+
+    admin_email = "admin@rids.org"
+    admin_password = "admin123"
+
+    existing = await db.users.find_one({"email": admin_email})
+    if existing:
+        return {"status": "admin already exists"}
+
+    admin_user = {
+        "id": "admin-001",
+        "name": "Admin",
+        "email": admin_email,
+        "password": get_password_hash(admin_password),
+        "role": "admin",
+        "is_active": True,
+        "created_at": datetime.utcnow()
+    }
+
+    await db.users.insert_one(admin_user)
+
+    return {
+        "status": "admin created",
+        "email": admin_email,
+        "password": admin_password
+    }
+
