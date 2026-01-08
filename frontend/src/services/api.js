@@ -2,14 +2,11 @@ import axios from 'axios';
 
 /* ================= BACKEND CONFIG ================= */
 
-// ✅ SAFE fallback backend URL
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL ||
   'https://ridsweb-backnd.vercel.app';
 
 const API = `${BACKEND_URL}/api`;
-
-console.log('✅ Backend API URL:', API);
 
 /* ================= AXIOS INSTANCE ================= */
 
@@ -68,7 +65,36 @@ export const programsAPI = {
   },
 };
 
-/* ================= STORIES API (🔥 FIXED) ================= */
+/* ================= NEWS API (🔥 FIXED) ================= */
+
+export const newsAPI = {
+  getAll: async () => {
+    const res = await apiClient.get('/news');
+    return res.data;
+  },
+
+  getById: async (id) => {
+    const res = await apiClient.get(`/news/${id}`);
+    return res.data;
+  },
+
+  create: async (data) => {
+    const res = await apiClient.post('/news', data);
+    return res.data;
+  },
+
+  update: async (id, data) => {
+    const res = await apiClient.put(`/news/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id) => {
+    const res = await apiClient.delete(`/news/${id}`);
+    return res.data;
+  },
+};
+
+/* ================= STORIES API ================= */
 
 export const storiesAPI = {
   getAll: async () => {
@@ -101,19 +127,8 @@ export const storiesAPI = {
 
 export const donationsAPI = {
   createOrder: async (donationData) => {
-    try {
-      console.log('➡️ Creating donation order:', donationData);
-      const res = await apiClient.post(
-        '/donations/create-order',
-        donationData
-      );
-      console.log('✅ Donation order response:', res.data);
-      return res.data;
-    } catch (error) {
-      console.error('❌ Donation order failed:', error);
-      console.error('❌ Backend response:', error?.response);
-      throw error;
-    }
+    const res = await apiClient.post('/donations/create-order', donationData);
+    return res.data;
   },
 };
 
