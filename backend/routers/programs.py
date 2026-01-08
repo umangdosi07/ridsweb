@@ -6,12 +6,22 @@ from models import Program, ProgramCreate, ProgramUpdate
 from auth import get_current_user
 from db import get_db
 
-router = APIRouter(prefix="/programs", tags=["Programs"])
+router = APIRouter(
+    prefix="/programs",
+    tags=["Programs"]
+)
 
-# ----------------------------
-# READ PROGRAMS
-# ----------------------------
-@router.get("", response_model=List[Program])
+# ======================================================
+# HEALTH CHECK (DEBUG & MONITORING)
+# ======================================================
+@router.get("/health")
+async def programs_health():
+    return {"status": "programs router alive"}
+
+# ======================================================
+# READ PROGRAMS (PUBLIC)
+# ======================================================
+@router.get("/", response_model=List[Program])
 async def get_programs(
     status: Optional[str] = None,
     category: Optional[str] = None
@@ -31,14 +41,15 @@ async def get_programs(
         .to_list(100)
     )
 
+    # Remove MongoDB internal field
     for p in programs:
         p.pop("_id", None)
 
     return [Program(**p) for p in programs]
 
-# ----------------------------
-# GET SINGLE PROGRAM
-# ----------------------------
+# ======================================================
+# GET SINGLE PROGRAM (PUBLIC)
+# ======================================================
 @router.get("/{program_id}", response_model=Program)
 async def get_program(program_id: str):
     db = get_db()
@@ -53,10 +64,10 @@ async def get_program(program_id: str):
     program.pop("_id", None)
     return Program(**program)
 
-# ----------------------------
-# CREATE PROGRAM (ADMIN)
-# ----------------------------
-@router.post("", response_model=Program)
+# ======================================================
+# CREATE PROGRAM (ADMIN ONLY)
+# ======================================================
+@router.post("/", response_model=Program)
 async def create_program(
     program: ProgramCreate,
     current_user: dict = Depends(get_current_user)
@@ -70,9 +81,9 @@ async def create_program(
     await db.programs.insert_one(program_dict)
     return program_obj
 
-# ----------------------------
-# UPDATE PROGRAM (ADMIN)
-# ----------------------------
+# ======================================================
+# UPDATE PROGRAM (ADMIN ONLY)
+# ======================================================
 @router.put("/{program_id}", response_model=Program)
 async def update_program(
     program_id: str,
@@ -103,9 +114,9 @@ async def update_program(
     updated.pop("_id", None)
     return Program(**updated)
 
-# ----------------------------
-# DELETE PROGRAM (ADMIN)
-# ----------------------------
+# ======================================================
+# DELETE PROGRAM (ADMIN ONLY)
+# ======================================================
 @router.delete("/{program_id}")
 async def delete_program(
     program_id: str,
