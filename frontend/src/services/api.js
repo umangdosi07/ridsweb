@@ -68,7 +68,36 @@ export const programsAPI = {
   },
 };
 
-/* ================= DONATIONS API (FIXED) ================= */
+/* ================= STORIES API (🔥 FIXED) ================= */
+
+export const storiesAPI = {
+  getAll: async () => {
+    const res = await apiClient.get('/stories');
+    return res.data;
+  },
+
+  getById: async (id) => {
+    const res = await apiClient.get(`/stories/${id}`);
+    return res.data;
+  },
+
+  create: async (data) => {
+    const res = await apiClient.post('/stories', data);
+    return res.data;
+  },
+
+  update: async (id, data) => {
+    const res = await apiClient.put(`/stories/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id) => {
+    const res = await apiClient.delete(`/stories/${id}`);
+    return res.data;
+  },
+};
+
+/* ================= DONATIONS API ================= */
 
 export const donationsAPI = {
   createOrder: async (donationData) => {
