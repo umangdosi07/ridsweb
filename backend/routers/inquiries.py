@@ -2,22 +2,45 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Optional
 from datetime import datetime
 from uuid import uuid4
+import os
+
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from models import Inquiry, InquiryCreate, InquiryUpdate
 from auth import get_current_user
-from db import get_db
 
-router = APIRouter(prefix="/inquiries", tags=["Contact Inquiries"])
+# ======================================================
+# ROUTER
+# ======================================================
+router = APIRouter(
+    prefix="/inquiries",
+    tags=["Contact Inquiries"]
+)
 
+# ======================================================
+# DATABASE
+# ======================================================
+MONGO_URL = os.getenv("MONGO_URL")
+DB_NAME = os.getenv("DB_NAME", "rids_ngo")
 
-# =========================
-# CREATE INQUIRY (PUBLIC)
-# =========================
+if not MONGO_URL:
+    raise RuntimeError("MONGO_URL is not set")
 
-@router.post("", response_model=Inquiry)
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
+
+# ======================================================
+# HEALTH CHECK
+# ======================================================
+@router.get("/health")
+def inquiries_health():
+    return {"status": "inquiries router alive"}
+
+# ======================================================
+# CREATE INQUIRY (PUBLIC – CONTACT FORM)
+# ======================================================
+@router.post("", response_model=Inquiry, status_code=status.HTTP_201_CREATED)
 async def create_inquiry(inquiry: InquiryCreate):
-    db = get_db()
-
     inquiry_doc = {
         "id": str(uuid4()),
         "name": inquiry.name,
@@ -26,27 +49,23 @@ async def create_inquiry(inquiry: InquiryCreate):
         "subject": inquiry.subject,
         "message": inquiry.message,
         "status": "new",
-        "created_at": datetime.utcnow()
+        "created_at": datetime.utcnow(),
     }
 
     await db.inquiries.insert_one(inquiry_doc)
-    inquiry_doc.pop("_id", None)
 
+    inquiry_doc.pop("_id", None)
     return Inquiry(**inquiry_doc)
 
-
-# =========================
-# GET ALL INQUIRIES (ADMIN)
-# =========================
-
+# ======================================================
+# GET ALL INQUIRIES (ADMIN ONLY)
+# ======================================================
 @router.get("", response_model=List[Inquiry])
 async def get_inquiries(
     status_filter: Optional[str] = None,
     limit: int = 100,
     current_user: dict = Depends(get_current_user)
 ):
-    db = get_db()
-
     query = {}
     if status_filter:
         query["status"] = status_filter
@@ -63,45 +82,20 @@ async def get_inquiries(
 
     return [Inquiry(**i) for i in inquiries]
 
-
-# =========================
-# INQUIRY STATS (ADMIN)
-# =========================
-
-@router.get("/stats")
-async def get_inquiry_stats(current_user: dict = Depends(get_current_user)):
-    db = get_db()
-
-    total = await db.inquiries.count_documents({})
-    new_count = await db.inquiries.count_documents({"status": "new"})
-    replied_count = await db.inquiries.count_documents({"status": "replied"})
-    closed_count = await db.inquiries.count_documents({"status": "closed"})
-
-    return {
-        "total": total,
-        "new": new_count,
-        "replied": replied_count,
-        "closed": closed_count
-    }
-
-
-# =========================
-# UPDATE STATUS (ADMIN)
-# =========================
-
+# ======================================================
+# UPDATE INQUIRY STATUS (ADMIN ONLY)
+# ======================================================
 @router.put("/{inquiry_id}", response_model=Inquiry)
 async def update_inquiry_status(
     inquiry_id: str,
     inquiry_update: InquiryUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    db = get_db()
-
     valid_statuses = ["new", "replied", "closed"]
     if inquiry_update.status not in valid_statuses:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid status. Must be one of {valid_statuses}"
+            status_code=400,
+            detail=f"Status must be one of {valid_statuses}"
         )
 
     result = await db.inquiries.update_one(
@@ -110,42 +104,23 @@ async def update_inquiry_status(
     )
 
     if result.matched_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Inquiry not found"
-        )
+        raise HTTPException(status_code=404, detail="Inquiry not found")
 
     updated = await db.inquiries.find_one({"id": inquiry_id})
     updated.pop("_id", None)
-
     return Inquiry(**updated)
 
-
-# =========================
-# DELETE INQUIRY (ADMIN)
-# =========================
-
+# ======================================================
+# DELETE INQUIRY (ADMIN ONLY)
+# ======================================================
 @router.delete("/{inquiry_id}")
 async def delete_inquiry(
     inquiry_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    db = get_db()
-
     result = await db.inquiries.delete_one({"id": inquiry_id})
+
     if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Inquiry not found"
-        )
+        raise HTTPException(status_code=404, detail="Inquiry not found")
 
     return {"message": "Inquiry deleted successfully"}
-
-
-# =========================
-# HEALTH CHECK
-# =========================
-
-@router.get("/health")
-async def inquiries_health():
-    return {"status": "inquiries router alive"}
