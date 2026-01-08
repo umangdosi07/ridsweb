@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from models import AdminUserCreate, AdminUserLogin, AdminUser, Token
 from auth import (
@@ -9,29 +9,34 @@ from auth import (
     verify_password,
     create_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    get_current_user
+    get_current_user,
 )
 
+# ======================================================
+# ROUTER
+# ======================================================
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # ======================================================
 # DATABASE
 # ======================================================
-mongo_url = os.environ.get("MONGO_URL")
-if not mongo_url:
+MONGO_URL = os.environ.get("MONGO_URL")
+DB_NAME = os.environ.get("DB_NAME", "rids_ngo")
+
+if not MONGO_URL:
     raise RuntimeError("MONGO_URL not set")
 
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get("DB_NAME", "rids_ngo")]
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
 
 # ======================================================
-# CREATE INITIAL ADMIN (ONE TIME ONLY)
+# SETUP INITIAL ADMIN (ONE TIME ONLY)
 # ======================================================
 @router.post("/setup")
 async def setup_initial_admin():
     """
-    Create initial admin user if none exists.
-    This endpoint works ONLY ONCE.
+    Create the first admin user if none exists.
+    Can be executed ONLY ONCE.
     """
     admin_count = await db.admin_users.count_documents({})
     if admin_count > 0:
@@ -40,25 +45,26 @@ async def setup_initial_admin():
             detail="Admin already exists. Use /login."
         )
 
-    admin_password = "admin123"
+    password = "admin123"
 
-    user_dict = {
+    user_data = {
         "email": "admin@rids.org",
         "name": "Admin",
-        "hashed_password": get_password_hash(admin_password),
-        "role": "admin"
+        "hashed_password": get_password_hash(password),
+        "role": "admin",
+        "is_active": True,
+        "created_at": datetime.utcnow(),
     }
 
-    admin_user = AdminUser(**user_dict)
-    user_dict["id"] = admin_user.id
-    user_dict["created_at"] = admin_user.created_at
+    admin_user = AdminUser(**user_data)
+    user_data["id"] = admin_user.id
 
-    await db.admin_users.insert_one(user_dict)
+    await db.admin_users.insert_one(user_data)
 
     return {
         "message": "Initial admin created successfully",
         "email": "admin@rids.org",
-        "password": admin_password,
+        "password": password,
         "note": "Change password after first login"
     }
 
@@ -68,44 +74,63 @@ async def setup_initial_admin():
 @router.post("/login", response_model=Token)
 async def login(credentials: AdminUserLogin):
     """
-    Admin login using email + password
+    Admin login with email & password
     """
-    user = await db.admin_users.find_one({"email": credentials.email})
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        user = await db.admin_users.find_one(
+            {"email": credentials.email}
         )
 
-    if not verify_password(credentials.password, user["hashed_password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+
+        if "hashed_password" not in user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User record corrupted"
+            )
+
+        if not verify_password(
+            credentials.password,
+            user["hashed_password"]
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+
+        access_token = create_access_token(
+            data={
+                "sub": user["email"],
+                "role": user["role"],
+                "name": user.get("name", ""),
+            },
+            expires_delta=timedelta(
+                minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+            ),
         )
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={
-            "sub": user["email"],
-            "name": user["name"],
-            "role": user["role"],
-        },
-        expires_delta=access_token_expires,
-    )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed"
+        )
 
 # ======================================================
-# GET CURRENT ADMIN
+# CURRENT ADMIN INFO
 # ======================================================
 @router.get("/me")
-async def get_current_user_info(
+async def get_current_admin(
     current_user: dict = Depends(get_current_user)
 ):
     user = await db.admin_users.find_one(
@@ -133,29 +158,26 @@ async def register_admin(
     user: AdminUserCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    Register a new admin (only existing admins can do this)
-    """
-    existing_user = await db.admin_users.find_one(
+    existing = await db.admin_users.find_one(
         {"email": user.email}
     )
-    if existing_user:
+    if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
 
-    user_dict = {
+    user_data = {
         "email": user.email,
         "name": user.name,
         "hashed_password": get_password_hash(user.password),
         "role": "admin",
+        "created_at": datetime.utcnow(),
     }
 
-    admin_user = AdminUser(**user_dict)
-    user_dict["id"] = admin_user.id
-    user_dict["created_at"] = admin_user.created_at
+    admin_user = AdminUser(**user_data)
+    user_data["id"] = admin_user.id
 
-    await db.admin_users.insert_one(user_dict)
+    await db.admin_users.insert_one(user_data)
 
     return admin_user
