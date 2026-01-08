@@ -9,16 +9,12 @@ from routers.programs import router as programs_router
 app = FastAPI(title="RIDS Backend")
 
 # ======================================================
-# 🔥 CORS CONFIGURATION (CRITICAL FIX)
+# ✅ CORS — FINAL, WORKING CONFIG
 # ======================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://ridsweb-6a6w.vercel.app",   # frontend production
-        "http://localhost:3000",             # local dev
-        "http://localhost:5173",             # local dev (vite)
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],          # ✅ allow all (safe for public APIs)
+    allow_credentials=False,      # ✅ IMPORTANT (fixes preflight failure)
     allow_methods=["*"],
     allow_headers=["*"],
 )
