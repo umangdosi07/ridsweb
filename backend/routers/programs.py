@@ -12,7 +12,7 @@ router = APIRouter(
 )
 
 # ======================================================
-# HEALTH CHECK (DEBUG & MONITORING)
+# HEALTH CHECK (MUST BE FIRST)
 # ======================================================
 @router.get("/health")
 async def programs_health():
@@ -41,7 +41,6 @@ async def get_programs(
         .to_list(100)
     )
 
-    # Remove MongoDB internal field
     for p in programs:
         p.pop("_id", None)
 
