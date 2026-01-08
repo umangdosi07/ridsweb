@@ -5,6 +5,7 @@ from routers.donations import router as donations_router
 from routers.auth import router as auth_router
 from routers.users import router as users_router
 from routers.programs import router as programs_router
+from routers.inquiries import router as inquiries_router   # ✅ ADD THIS
 
 app = FastAPI(title="RIDS Backend")
 
@@ -13,8 +14,8 @@ app = FastAPI(title="RIDS Backend")
 # ======================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # ✅ allow all (safe for public APIs)
-    allow_credentials=False,      # ✅ IMPORTANT (fixes preflight failure)
+    allow_origins=["*"],          # Public website + admin panel
+    allow_credentials=False,      # IMPORTANT for Vercel + browsers
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,3 +36,4 @@ app.include_router(donations_router, prefix=API_PREFIX)
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(users_router, prefix=API_PREFIX)
 app.include_router(programs_router, prefix=API_PREFIX)
+app.include_router(inquiries_router, prefix=API_PREFIX)   # ✅ REQUIRED
