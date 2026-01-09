@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-/* ================= BACKEND CONFIG ================= */
+/* =====================================================
+   BACKEND CONFIG
+===================================================== */
 
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL ||
@@ -8,7 +10,9 @@ const BACKEND_URL =
 
 const API = `${BACKEND_URL}/api`;
 
-/* ================= AXIOS INSTANCE ================= */
+/* =====================================================
+   AXIOS INSTANCE
+===================================================== */
 
 const apiClient = axios.create({
   baseURL: API,
@@ -17,7 +21,9 @@ const apiClient = axios.create({
   },
 });
 
-/* ================= REQUEST INTERCEPTOR ================= */
+/* =====================================================
+   REQUEST INTERCEPTOR (ADMIN AUTH)
+===================================================== */
 
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('admin_token');
@@ -27,7 +33,9 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-/* ================= RESPONSE INTERCEPTOR ================= */
+/* =====================================================
+   RESPONSE INTERCEPTOR
+===================================================== */
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -47,7 +55,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-/* ================= AUTH API ================= */
+/* =====================================================
+   AUTH API
+===================================================== */
 
 export const authAPI = {
   login: async (email, password) => {
@@ -56,7 +66,9 @@ export const authAPI = {
   },
 };
 
-/* ================= PROGRAMS API ================= */
+/* =====================================================
+   PROGRAMS API
+===================================================== */
 
 export const programsAPI = {
   getAll: async () => {
@@ -65,15 +77,32 @@ export const programsAPI = {
   },
 };
 
-/* ================= INQUIRIES API ================= */
+/* =====================================================
+   DONATIONS API (SAFE PLACEHOLDERS)
+===================================================== */
 
-export const inquiriesAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/inquiries');
+export const donationsAPI = {
+  createOrder: async (data) => {
+    const res = await apiClient.post('/donations/create-order', data);
     return res.data;
   },
+  getAll: async () => {
+    const res = await apiClient.get('/donations');
+    return res.data;
+  },
+};
+
+/* =====================================================
+   INQUIRIES (CONTACT FORM)
+===================================================== */
+
+export const inquiriesAPI = {
   create: async (data) => {
     const res = await apiClient.post('/inquiries', data);
+    return res.data;
+  },
+  getAll: async () => {
+    const res = await apiClient.get('/inquiries');
     return res.data;
   },
   updateStatus: async (id, status) => {
@@ -86,15 +115,17 @@ export const inquiriesAPI = {
   },
 };
 
-/* ================= VOLUNTEERS API ================= */
+/* =====================================================
+   VOLUNTEERS API
+===================================================== */
 
 export const volunteersAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/volunteers');
-    return res.data;
-  },
   create: async (data) => {
     const res = await apiClient.post('/volunteers', data);
+    return res.data;
+  },
+  getAll: async () => {
+    const res = await apiClient.get('/volunteers');
     return res.data;
   },
   updateStatus: async (id, status) => {
@@ -107,7 +138,9 @@ export const volunteersAPI = {
   },
 };
 
-/* ================= USERS API ================= */
+/* =====================================================
+   USERS API (ADMIN)
+===================================================== */
 
 export const usersAPI = {
   getAll: async () => {
@@ -124,7 +157,9 @@ export const usersAPI = {
   },
 };
 
-/* ================= DASHBOARD API ================= */
+/* =====================================================
+   DASHBOARD API (SAFE PLACEHOLDERS)
+===================================================== */
 
 export const dashboardAPI = {
   getStats: async () => {
@@ -137,6 +172,52 @@ export const dashboardAPI = {
   },
 };
 
-/* ================= DEFAULT ================= */
+/* =====================================================
+   NEWS API (PLACEHOLDER – PREVENTS BUILD FAIL)
+===================================================== */
+
+export const newsAPI = {
+  getAll: async () => {
+    return [];
+  },
+};
+
+/* =====================================================
+   STORIES API (PLACEHOLDER – PREVENTS BUILD FAIL)
+===================================================== */
+
+export const storiesAPI = {
+  getAll: async () => {
+    return [];
+  },
+};
+
+/* =====================================================
+   GALLERY API (PLACEHOLDER – PREVENTS BUILD FAIL)
+===================================================== */
+
+export const galleryAPI = {
+  getAll: async () => {
+    return [];
+  },
+};
+
+/* =====================================================
+   NEWSLETTER API (CRITICAL FOR BUILD)
+===================================================== */
+
+export const newsletterAPI = {
+  subscribe: async (email) => {
+    const res = await apiClient.post('/newsletter', { email });
+    return res.data;
+  },
+  getAll: async () => {
+    return [];
+  },
+};
+
+/* =====================================================
+   DEFAULT EXPORT
+===================================================== */
 
 export default apiClient;
