@@ -65,6 +65,25 @@ export const programsAPI = {
   },
 };
 
+/* ================= DONATIONS API (REQUIRED) ================= */
+
+export const donationsAPI = {
+  createOrder: async (data) => {
+    const res = await apiClient.post('/donations/create-order', data);
+    return res.data;
+  },
+
+  getAll: async () => {
+    const res = await apiClient.get('/donations');
+    return res.data;
+  },
+
+  getStats: async () => {
+    const res = await apiClient.get('/donations/stats');
+    return res.data;
+  },
+};
+
 /* ================= INQUIRIES API ================= */
 
 export const inquiriesAPI = {
@@ -89,7 +108,7 @@ export const inquiriesAPI = {
   },
 };
 
-/* ================= NEWSLETTER API (REQUIRED FOR BUILD) ================= */
+/* ================= NEWSLETTER API ================= */
 
 export const newsletterAPI = {
   subscribe: async (email) => {
