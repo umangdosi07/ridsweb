@@ -65,7 +65,7 @@ export const programsAPI = {
   },
 };
 
-/* ================= DONATIONS API (REQUIRED) ================= */
+/* ================= DONATIONS API ================= */
 
 export const donationsAPI = {
   createOrder: async (data) => {
@@ -104,6 +104,57 @@ export const inquiriesAPI = {
 
   delete: async (id) => {
     const res = await apiClient.delete(`/inquiries/${id}`);
+    return res.data;
+  },
+};
+
+/* ================= VOLUNTEERS API ================= */
+
+export const volunteersAPI = {
+  create: async (data) => {
+    const res = await apiClient.post('/volunteers', data);
+    return res.data;
+  },
+
+  getAll: async () => {
+    const res = await apiClient.get('/volunteers');
+    return res.data;
+  },
+
+  updateStatus: async (id, status) => {
+    const res = await apiClient.put(`/volunteers/${id}`, { status });
+    return res.data;
+  },
+
+  delete: async (id) => {
+    const res = await apiClient.delete(`/volunteers/${id}`);
+    return res.data;
+  },
+};
+
+/* ================= NEWS API ================= */
+
+export const newsAPI = {
+  getAll: async () => {
+    const res = await apiClient.get('/news');
+    return res.data;
+  },
+};
+
+/* ================= STORIES API ================= */
+
+export const storiesAPI = {
+  getAll: async () => {
+    const res = await apiClient.get('/stories');
+    return res.data;
+  },
+};
+
+/* ================= GALLERY API ================= */
+
+export const galleryAPI = {
+  getAll: async () => {
+    const res = await apiClient.get('/gallery');
     return res.data;
   },
 };
