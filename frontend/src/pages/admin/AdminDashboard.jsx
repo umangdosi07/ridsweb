@@ -1,41 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Mail,
-  Users,
-  LogOut,
-  Menu,
-  Shield,
-  CheckCircle,
-  Trash2,
-} from 'lucide-react';
+import { Mail, Users, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 
-import {
-  inquiriesAPI,
-  volunteersAPI,
-} from '../../services/api';
+import { inquiriesAPI, volunteersAPI } from '../../services/api';
 
 const AdminDashboard = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
+  const [activeTab, setActiveTab] = useState('inquiries');
   const [inquiries, setInquiries] = useState([]);
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  /* ================= AUTH CHECK ================= */
-
-  useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (!token) navigate('/admin/login');
-  }, [navigate]);
-
-  /* ================= LOADERS ================= */
+  /* ================= FETCH ================= */
 
   const loadInquiries = async () => {
     setLoading(true);
@@ -62,223 +40,149 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'inquiries') loadInquiries();
-    if (activeTab === 'volunteers') loadVolunteers();
+    activeTab === 'inquiries' ? loadInquiries() : loadVolunteers();
   }, [activeTab]);
 
   /* ================= ACTIONS ================= */
 
-  const logout = () => {
-    localStorage.clear();
-    navigate('/admin/login');
+  const updateInquiryStatus = async (id, status) => {
+    await inquiriesAPI.updateStatus(id, status);
+    toast.success('Status updated');
+    loadInquiries();
   };
 
-  /* ================= SIDEBAR ================= */
+  const deleteInquiry = async (id) => {
+    if (!confirm('Delete inquiry?')) return;
+    await inquiriesAPI.delete(id);
+    toast.success('Inquiry deleted');
+    loadInquiries();
+  };
 
-  const tabs = [
-    { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'inquiries', label: 'Inquiries', icon: Mail },
-    { id: 'volunteers', label: 'Volunteers', icon: Users },
-  ];
+  const updateVolunteerStatus = async (id, status) => {
+    await volunteersAPI.updateStatus(id, status);
+    toast.success('Status updated');
+    loadVolunteers();
+  };
 
-  /* ================= RENDER ================= */
+  const deleteVolunteer = async (id) => {
+    if (!confirm('Delete volunteer application?')) return;
+    await volunteersAPI.delete(id);
+    toast.success('Volunteer deleted');
+    loadVolunteers();
+  };
 
-  const renderContent = () => {
-    if (activeTab === 'overview') {
-      return (
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Inquiries</CardTitle>
-            </CardHeader>
-            <CardContent className="text-3xl font-bold">
-              {inquiries.length}
-            </CardContent>
-          </Card>
+  /* ================= UI ================= */
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Volunteers</CardTitle>
-            </CardHeader>
-            <CardContent className="text-3xl font-bold">
-              {volunteers.length}
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
+  return (
+    <div className="p-4 md:p-6 space-y-6">
 
-    if (activeTab === 'inquiries') {
-      return (
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <Button
+          variant={activeTab === 'inquiries' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('inquiries')}
+        >
+          <Mail className="mr-2" size={16} /> Inquiries
+        </Button>
+        <Button
+          variant={activeTab === 'volunteers' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('volunteers')}
+        >
+          <Users className="mr-2" size={16} /> Volunteers
+        </Button>
+      </div>
+
+      {/* ================= INQUIRIES ================= */}
+      {activeTab === 'inquiries' && (
         <Card>
           <CardHeader>
             <CardTitle>Contact Inquiries</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            {loading ? (
-              <p className="text-center">Loading…</p>
-            ) : inquiries.length === 0 ? (
-              <p className="text-center text-stone-500">No inquiries yet</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2 text-left">Name</th>
-                    <th className="p-2 text-left">Subject</th>
-                    <th className="p-2 text-left">Status</th>
-                    <th className="p-2 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inquiries.map((i) => (
-                    <tr key={i.id} className="border-b">
-                      <td className="p-2">{i.name}</td>
-                      <td className="p-2">{i.subject}</td>
-                      <td className="p-2 capitalize">{i.status}</td>
-                      <td className="p-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            inquiriesAPI
-                              .updateStatus(i.id, 'replied')
-                              .then(loadInquiries)
-                          }
-                        >
-                          Replied
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() =>
-                            inquiriesAPI
-                              .delete(i.id)
-                              .then(loadInquiries)
-                          }
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <CardContent className="space-y-4">
+            {loading && <p>Loading...</p>}
+
+            {inquiries.map((i) => (
+              <div
+                key={i.id}
+                className="border rounded-lg p-4 space-y-2 flex flex-col md:flex-row md:justify-between"
+              >
+                <div className="space-y-1">
+                  <p className="font-semibold">{i.name}</p>
+                  <p className="text-sm text-stone-600">{i.email}</p>
+                  <p className="text-sm"><b>Subject:</b> {i.subject}</p>
+                  <p className="text-sm text-stone-700">{i.message}</p>
+                  <Badge>{i.status}</Badge>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
+                  <Button size="sm" onClick={() => updateInquiryStatus(i.id, 'replied')}>
+                    <CheckCircle size={14} className="mr-1" /> Replied
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => updateInquiryStatus(i.id, 'closed')}>
+                    Close
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => deleteInquiry(i.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
-      );
-    }
+      )}
 
-    if (activeTab === 'volunteers') {
-      return (
+      {/* ================= VOLUNTEERS ================= */}
+      {activeTab === 'volunteers' && (
         <Card>
           <CardHeader>
             <CardTitle>Volunteer Applications</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            {loading ? (
-              <p className="text-center">Loading…</p>
-            ) : volunteers.length === 0 ? (
-              <p className="text-center text-stone-500">No applications</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2 text-left">Name</th>
-                    <th className="p-2 text-left">City</th>
-                    <th className="p-2 text-left">Interest</th>
-                    <th className="p-2 text-left">Status</th>
-                    <th className="p-2 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {volunteers.map((v) => (
-                    <tr key={v.id} className="border-b">
-                      <td className="p-2">{v.name}</td>
-                      <td className="p-2">{v.city}</td>
-                      <td className="p-2">{v.interest}</td>
-                      <td className="p-2 capitalize">{v.status}</td>
-                      <td className="p-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            volunteersAPI
-                              .updateStatus(v.id, 'accepted')
-                              .then(loadVolunteers)
-                          }
-                        >
-                          <CheckCircle size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() =>
-                            volunteersAPI
-                              .delete(v.id)
-                              .then(loadVolunteers)
-                          }
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <CardContent className="space-y-4">
+            {loading && <p>Loading...</p>}
+
+            {volunteers.map((v) => (
+              <div
+                key={v.id}
+                className="border rounded-lg p-4 space-y-2 flex flex-col md:flex-row md:justify-between"
+              >
+                <div className="space-y-1">
+                  <p className="font-semibold">{v.name}</p>
+                  <p className="text-sm">{v.email} | {v.phone}</p>
+                  <p className="text-sm">{v.city}</p>
+                  <p className="text-sm"><b>Interest:</b> {v.interest}</p>
+                  <p className="text-sm"><b>Availability:</b> {v.availability}</p>
+                  <p className="text-sm">{v.experience}</p>
+                  <p className="text-sm text-stone-700">{v.message}</p>
+                  <Badge>{v.status}</Badge>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
+                  <Button size="sm" onClick={() => updateVolunteerStatus(v.id, 'contacted')}>
+                    Contacted
+                  </Button>
+                  <Button size="sm" onClick={() => updateVolunteerStatus(v.id, 'accepted')}>
+                    Accept
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => updateVolunteerStatus(v.id, 'rejected')}>
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => deleteVolunteer(v.id)}
+                  >
+                    <XCircle size={14} />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
-      );
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-stone-100 flex">
-      {/* Sidebar */}
-      <aside className={`bg-white shadow-lg ${sidebarOpen ? 'w-64' : 'w-16'} transition-all`}>
-        <div className="p-4 flex items-center gap-2">
-          <Shield />
-          {sidebarOpen && <span className="font-bold">Admin</span>}
-        </div>
-
-        <nav className="p-2 space-y-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`w-full flex items-center gap-2 p-2 rounded ${
-                activeTab === t.id
-                  ? 'bg-terracotta-100 text-terracotta-700'
-                  : 'hover:bg-stone-100'
-              }`}
-            >
-              <t.icon size={18} />
-              {sidebarOpen && t.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-2">
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-2 p-2 text-red-600 hover:bg-red-50 rounded"
-          >
-            <LogOut size={18} />
-            {sidebarOpen && 'Logout'}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1">
-        <header className="bg-white shadow p-4 flex justify-between">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <Menu />
-          </button>
-          <span className="font-medium capitalize">{activeTab}</span>
-        </header>
-
-        <main className="p-6">{renderContent()}</main>
-      </div>
+      )}
     </div>
   );
 };
