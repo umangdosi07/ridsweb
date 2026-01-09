@@ -47,7 +47,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-/* ================= AUTH ================= */
+/* ================= AUTH API ================= */
 
 export const authAPI = {
   login: async (email, password) => {
@@ -56,7 +56,7 @@ export const authAPI = {
   },
 };
 
-/* ================= PROGRAMS ================= */
+/* ================= PROGRAMS API ================= */
 
 export const programsAPI = {
   getAll: async () => {
@@ -65,9 +65,14 @@ export const programsAPI = {
   },
 };
 
-/* ================= INQUIRIES (CONTACT FORM) ================= */
+/* ================= INQUIRIES API ================= */
 
 export const inquiriesAPI = {
+  create: async (data) => {
+    const res = await apiClient.post('/inquiries', data);
+    return res.data;
+  },
+
   getAll: async () => {
     const res = await apiClient.get('/inquiries');
     return res.data;
@@ -82,14 +87,23 @@ export const inquiriesAPI = {
     const res = await apiClient.delete(`/inquiries/${id}`);
     return res.data;
   },
+};
 
-  create: async (data) => {
-    const res = await apiClient.post('/inquiries', data);
+/* ================= NEWSLETTER API (REQUIRED FOR BUILD) ================= */
+
+export const newsletterAPI = {
+  subscribe: async (email) => {
+    const res = await apiClient.post('/newsletter', { email });
+    return res.data;
+  },
+
+  getAll: async () => {
+    const res = await apiClient.get('/newsletter');
     return res.data;
   },
 };
 
-/* ================= USERS ================= */
+/* ================= USERS API ================= */
 
 export const usersAPI = {
   getAll: async () => {
@@ -108,7 +122,7 @@ export const usersAPI = {
   },
 };
 
-/* ================= DASHBOARD ================= */
+/* ================= DASHBOARD API ================= */
 
 export const dashboardAPI = {
   getStats: async () => {
@@ -121,5 +135,7 @@ export const dashboardAPI = {
     return res.data;
   },
 };
+
+/* ================= DEFAULT EXPORT ================= */
 
 export default apiClient;
