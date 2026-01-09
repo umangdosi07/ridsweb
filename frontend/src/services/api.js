@@ -47,7 +47,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-/* ================= AUTH API ================= */
+/* ================= AUTH ================= */
 
 export const authAPI = {
   login: async (email, password) => {
@@ -56,7 +56,7 @@ export const authAPI = {
   },
 };
 
-/* ================= PROGRAMS API ================= */
+/* ================= PROGRAMS ================= */
 
 export const programsAPI = {
   getAll: async () => {
@@ -65,130 +65,61 @@ export const programsAPI = {
   },
 };
 
-/* ================= NEWS API (🔥 FIXED) ================= */
-
-export const newsAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/news');
-    return res.data;
-  },
-
-  getById: async (id) => {
-    const res = await apiClient.get(`/news/${id}`);
-    return res.data;
-  },
-
-  create: async (data) => {
-    const res = await apiClient.post('/news', data);
-    return res.data;
-  },
-
-  update: async (id, data) => {
-    const res = await apiClient.put(`/news/${id}`, data);
-    return res.data;
-  },
-
-  delete: async (id) => {
-    const res = await apiClient.delete(`/news/${id}`);
-    return res.data;
-  },
-};
-
-/* ================= STORIES API ================= */
-
-export const storiesAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/stories');
-    return res.data;
-  },
-
-  getById: async (id) => {
-    const res = await apiClient.get(`/stories/${id}`);
-    return res.data;
-  },
-
-  create: async (data) => {
-    const res = await apiClient.post('/stories', data);
-    return res.data;
-  },
-
-  update: async (id, data) => {
-    const res = await apiClient.put(`/stories/${id}`, data);
-    return res.data;
-  },
-
-  delete: async (id) => {
-    const res = await apiClient.delete(`/stories/${id}`);
-    return res.data;
-  },
-};
-
-/* ================= DONATIONS API ================= */
-
-export const donationsAPI = {
-  createOrder: async (donationData) => {
-    const res = await apiClient.post('/donations/create-order', donationData);
-    return res.data;
-  },
-};
-
-/* ================= NEWSLETTER API ================= */
-
-export const newsletterAPI = {
-  subscribe: async (email) => {
-    const res = await apiClient.post('/newsletter', { email });
-    return res.data;
-  },
-  getAll: async () => {
-    const res = await apiClient.get('/newsletter');
-    return res.data;
-  },
-};
-
-/* ================= INQUIRIES API ================= */
+/* ================= INQUIRIES (CONTACT FORM) ================= */
 
 export const inquiriesAPI = {
-  create: async (data) => {
-    const res = await apiClient.post('/inquiries', data);
-    return res.data;
-  },
   getAll: async () => {
     const res = await apiClient.get('/inquiries');
     return res.data;
   },
-};
 
-/* ================= VOLUNTEERS API ================= */
+  updateStatus: async (id, status) => {
+    const res = await apiClient.put(`/inquiries/${id}`, { status });
+    return res.data;
+  },
 
-export const volunteersAPI = {
+  delete: async (id) => {
+    const res = await apiClient.delete(`/inquiries/${id}`);
+    return res.data;
+  },
+
   create: async (data) => {
-    const res = await apiClient.post('/volunteers', data);
-    return res.data;
-  },
-  getAll: async () => {
-    const res = await apiClient.get('/volunteers');
+    const res = await apiClient.post('/inquiries', data);
     return res.data;
   },
 };
 
-/* ================= USERS API ================= */
+/* ================= USERS ================= */
 
 export const usersAPI = {
   getAll: async () => {
     const res = await apiClient.get('/users');
     return res.data;
   },
+
+  create: async (data) => {
+    const res = await apiClient.post('/users', data);
+    return res.data;
+  },
+
+  delete: async (id) => {
+    const res = await apiClient.delete(`/users/${id}`);
+    return res.data;
+  },
 };
 
-/* ================= DASHBOARD API ================= */
+/* ================= DASHBOARD ================= */
 
 export const dashboardAPI = {
   getStats: async () => {
     const res = await apiClient.get('/dashboard/stats');
     return res.data;
   },
-};
 
-/* ================= EXPORT CLIENT ================= */
+  getRecentActivity: async () => {
+    const res = await apiClient.get('/dashboard/recent');
+    return res.data;
+  },
+};
 
 export default apiClient;
