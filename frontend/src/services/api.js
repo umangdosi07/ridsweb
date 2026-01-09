@@ -65,43 +65,21 @@ export const programsAPI = {
   },
 };
 
-/* ================= DONATIONS API ================= */
-
-export const donationsAPI = {
-  createOrder: async (data) => {
-    const res = await apiClient.post('/donations/create-order', data);
-    return res.data;
-  },
-
-  getAll: async () => {
-    const res = await apiClient.get('/donations');
-    return res.data;
-  },
-
-  getStats: async () => {
-    const res = await apiClient.get('/donations/stats');
-    return res.data;
-  },
-};
-
 /* ================= INQUIRIES API ================= */
 
 export const inquiriesAPI = {
-  create: async (data) => {
-    const res = await apiClient.post('/inquiries', data);
-    return res.data;
-  },
-
   getAll: async () => {
     const res = await apiClient.get('/inquiries');
     return res.data;
   },
-
+  create: async (data) => {
+    const res = await apiClient.post('/inquiries', data);
+    return res.data;
+  },
   updateStatus: async (id, status) => {
     const res = await apiClient.put(`/inquiries/${id}`, { status });
     return res.data;
   },
-
   delete: async (id) => {
     const res = await apiClient.delete(`/inquiries/${id}`);
     return res.data;
@@ -111,64 +89,20 @@ export const inquiriesAPI = {
 /* ================= VOLUNTEERS API ================= */
 
 export const volunteersAPI = {
-  create: async (data) => {
-    const res = await apiClient.post('/volunteers', data);
-    return res.data;
-  },
-
   getAll: async () => {
     const res = await apiClient.get('/volunteers');
     return res.data;
   },
-
+  create: async (data) => {
+    const res = await apiClient.post('/volunteers', data);
+    return res.data;
+  },
   updateStatus: async (id, status) => {
     const res = await apiClient.put(`/volunteers/${id}`, { status });
     return res.data;
   },
-
   delete: async (id) => {
     const res = await apiClient.delete(`/volunteers/${id}`);
-    return res.data;
-  },
-};
-
-/* ================= NEWS API ================= */
-
-export const newsAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/news');
-    return res.data;
-  },
-};
-
-/* ================= STORIES API ================= */
-
-export const storiesAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/stories');
-    return res.data;
-  },
-};
-
-/* ================= GALLERY API ================= */
-
-export const galleryAPI = {
-  getAll: async () => {
-    const res = await apiClient.get('/gallery');
-    return res.data;
-  },
-};
-
-/* ================= NEWSLETTER API ================= */
-
-export const newsletterAPI = {
-  subscribe: async (email) => {
-    const res = await apiClient.post('/newsletter', { email });
-    return res.data;
-  },
-
-  getAll: async () => {
-    const res = await apiClient.get('/newsletter');
     return res.data;
   },
 };
@@ -180,12 +114,10 @@ export const usersAPI = {
     const res = await apiClient.get('/users');
     return res.data;
   },
-
   create: async (data) => {
     const res = await apiClient.post('/users', data);
     return res.data;
   },
-
   delete: async (id) => {
     const res = await apiClient.delete(`/users/${id}`);
     return res.data;
@@ -199,13 +131,12 @@ export const dashboardAPI = {
     const res = await apiClient.get('/dashboard/stats');
     return res.data;
   },
-
   getRecentActivity: async () => {
     const res = await apiClient.get('/dashboard/recent');
     return res.data;
   },
 };
 
-/* ================= DEFAULT EXPORT ================= */
+/* ================= DEFAULT ================= */
 
 export default apiClient;
