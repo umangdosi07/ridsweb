@@ -5,7 +5,9 @@ import {
   Heart,
   Trash2,
   CheckCircle,
-  XCircle
+  XCircle,
+  Menu,
+  LogOut,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/button';
@@ -16,23 +18,26 @@ import { toast } from 'sonner';
 import {
   inquiriesAPI,
   volunteersAPI,
-  donationsAPI
+  donationsAPI,
 } from '../../services/api';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inquiries');
-  const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [inquiries, setInquiries] = useState([]);
   const [volunteers, setVolunteers] = useState([]);
   const [donations, setDonations] = useState([]);
 
-  /* ================= LOADERS ================= */
+  const [loading, setLoading] = useState(false);
+
+  /* ================= FETCH ================= */
 
   const loadInquiries = async () => {
     setLoading(true);
     try {
-      setInquiries(await inquiriesAPI.getAll());
+      const data = await inquiriesAPI.getAll();
+      setInquiries(data);
     } catch {
       toast.error('Failed to load inquiries');
     } finally {
@@ -43,7 +48,8 @@ const AdminDashboard = () => {
   const loadVolunteers = async () => {
     setLoading(true);
     try {
-      setVolunteers(await volunteersAPI.getAll());
+      const data = await volunteersAPI.getAll();
+      setVolunteers(data);
     } catch {
       toast.error('Failed to load volunteers');
     } finally {
@@ -54,7 +60,8 @@ const AdminDashboard = () => {
   const loadDonations = async () => {
     setLoading(true);
     try {
-      setDonations(await donationsAPI.getAll());
+      const data = await donationsAPI.getAll();
+      setDonations(data);
     } catch {
       toast.error('Failed to load donations');
     } finally {
@@ -70,143 +77,183 @@ const AdminDashboard = () => {
 
   /* ================= ACTIONS ================= */
 
-  const deleteItem = async (type, id) => {
-    if (!confirm('Are you sure?')) return;
+  const updateInquiryStatus = async (id, status) => {
+    await inquiriesAPI.updateStatus(id, status);
+    toast.success('Status updated');
+    loadInquiries();
+  };
 
-    try {
-      if (type === 'inquiry') await inquiriesAPI.delete(id);
-      if (type === 'volunteer') await volunteersAPI.delete(id);
-      if (type === 'donation') await donationsAPI.delete(id);
+  const deleteInquiry = async (id) => {
+    if (!confirm('Delete inquiry?')) return;
+    await inquiriesAPI.delete(id);
+    toast.success('Inquiry deleted');
+    loadInquiries();
+  };
 
-      toast.success('Deleted successfully');
+  const updateVolunteerStatus = async (id, status) => {
+    await volunteersAPI.updateStatus(id, status);
+    toast.success('Status updated');
+    loadVolunteers();
+  };
 
-      if (type === 'inquiry') loadInquiries();
-      if (type === 'volunteer') loadVolunteers();
-      if (type === 'donation') loadDonations();
-    } catch {
-      toast.error('Delete failed');
-    }
+  const deleteVolunteer = async (id) => {
+    if (!confirm('Delete volunteer application?')) return;
+    await volunteersAPI.delete(id);
+    toast.success('Volunteer deleted');
+    loadVolunteers();
+  };
+
+  const logout = () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    window.location.href = '/admin/login';
   };
 
   /* ================= UI ================= */
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="min-h-screen flex bg-stone-100">
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={activeTab === 'inquiries' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('inquiries')}
-        >
-          <Mail size={16} className="mr-2" /> Inquiries
-        </Button>
+      {/* ================= SIDEBAR ================= */}
+      <aside
+        className={`bg-white shadow-lg transition-all duration-300
+        ${sidebarOpen ? 'w-64' : 'w-16'} hidden md:block`}
+      >
+        <div className="p-4 font-bold text-lg">RIDS Admin</div>
 
-        <Button
-          variant={activeTab === 'volunteers' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('volunteers')}
-        >
-          <Users size={16} className="mr-2" /> Volunteers
-        </Button>
+        <nav className="space-y-1 p-2">
+          {[
+            { id: 'inquiries', label: 'Inquiries', icon: Mail },
+            { id: 'volunteers', label: 'Volunteers', icon: Users },
+            { id: 'donations', label: 'Donations', icon: Heart },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-3 w-full px-3 py-2 rounded
+              ${activeTab === item.id ? 'bg-terracotta-100 text-terracotta-700' : 'hover:bg-stone-100'}`}
+            >
+              <item.icon size={18} />
+              {sidebarOpen && item.label}
+            </button>
+          ))}
+        </nav>
 
-        <Button
-          variant={activeTab === 'donations' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('donations')}
-        >
-          <Heart size={16} className="mr-2" /> Donations
-        </Button>
-      </div>
+        <div className="p-2">
+          <Button
+            variant="destructive"
+            className="w-full flex gap-2"
+            onClick={logout}
+          >
+            <LogOut size={16} />
+            {sidebarOpen && 'Logout'}
+          </Button>
+        </div>
+      </aside>
 
-      {/* ================= INQUIRIES ================= */}
-      {activeTab === 'inquiries' && (
-        <Card>
-          <CardHeader><CardTitle>Contact Inquiries</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {loading && <p>Loading...</p>}
+      {/* ================= MAIN ================= */}
+      <main className="flex-1 p-4 md:p-6 space-y-6">
 
-            {inquiries.map(i => (
-              <div key={i.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:justify-between gap-4">
-                <div>
-                  <p className="font-semibold">{i.name}</p>
-                  <p className="text-sm">{i.email}</p>
-                  <p className="text-sm"><b>Subject:</b> {i.subject}</p>
-                  <p className="text-sm">{i.message}</p>
-                  <Badge>{i.status}</Badge>
+        {/* Mobile Top Bar */}
+        <div className="flex items-center gap-3 md:hidden">
+          <Button size="icon" variant="outline" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            <Menu size={18} />
+          </Button>
+          <h1 className="font-bold capitalize">{activeTab}</h1>
+        </div>
+
+        {/* ================= INQUIRIES ================= */}
+        {activeTab === 'inquiries' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact Inquiries</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {inquiries.map((i) => (
+                <div key={i.id} className="border rounded-lg p-4 space-y-2">
+                  <div>
+                    <p className="font-semibold">{i.name}</p>
+                    <p className="text-sm">{i.email}</p>
+                    <p className="text-sm"><b>Subject:</b> {i.subject}</p>
+                    <p className="text-sm">{i.message}</p>
+                    <Badge>{i.status}</Badge>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => updateInquiryStatus(i.id, 'replied')}>
+                      Replied
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => updateInquiryStatus(i.id, 'closed')}>
+                      Close
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => deleteInquiry(i.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => deleteItem('inquiry', i.id)}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ================= VOLUNTEERS ================= */}
-      {activeTab === 'volunteers' && (
-        <Card>
-          <CardHeader><CardTitle>Volunteer Applications</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {loading && <p>Loading...</p>}
-
-            {volunteers.map(v => (
-              <div key={v.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:justify-between gap-4">
-                <div>
+        {/* ================= VOLUNTEERS ================= */}
+        {activeTab === 'volunteers' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Volunteer Applications</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {volunteers.map((v) => (
+                <div key={v.id} className="border rounded-lg p-4 space-y-2">
                   <p className="font-semibold">{v.name}</p>
                   <p className="text-sm">{v.email} | {v.phone}</p>
                   <p className="text-sm">{v.city}</p>
                   <p className="text-sm"><b>Interest:</b> {v.interest}</p>
                   <p className="text-sm">{v.message}</p>
                   <Badge>{v.status}</Badge>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => updateVolunteerStatus(v.id, 'contacted')}>
+                      Contacted
+                    </Button>
+                    <Button size="sm" onClick={() => updateVolunteerStatus(v.id, 'accepted')}>
+                      Accept
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => updateVolunteerStatus(v.id, 'rejected')}>
+                      Reject
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => deleteVolunteer(v.id)}>
+                      <XCircle size={14} />
+                    </Button>
+                  </div>
                 </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => deleteItem('volunteer', v.id)}
-                >
-                  <XCircle size={14} />
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ================= DONATIONS ================= */}
-      {activeTab === 'donations' && (
-        <Card>
-          <CardHeader><CardTitle>Donations</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {loading && <p>Loading...</p>}
-
-            {donations.map(d => (
-              <div key={d.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:justify-between gap-4">
-                <div>
-                  <p className="font-semibold">{d.name}</p>
-                  <p className="text-sm">{d.email}</p>
-                  <p className="text-sm"><b>Amount:</b> ₹{d.amount}</p>
-                  <p className="text-sm"><b>Program:</b> {d.program}</p>
-                  <Badge>{d.status}</Badge>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => deleteItem('donation', d.id)}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+        {/* ================= DONATIONS ================= */}
+        {activeTab === 'donations' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Donations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {donations.length === 0 ? (
+                <p className="text-stone-500">
+                  Donations backend not connected yet.
+                </p>
+              ) : (
+                donations.map((d) => (
+                  <div key={d.id} className="border p-3 rounded">
+                    {d.name} — ₹{d.amount}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </main>
     </div>
   );
 };
