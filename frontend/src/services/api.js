@@ -216,6 +216,17 @@ export const newsletterAPI = {
   },
 };
 
+/* ================= EXPORT API ================= */
+
+export const exportAPI = {
+  donationsCSV: () => {
+    return apiClient.get('/export/donations', {
+      responseType: 'blob',
+    });
+  },
+};
+
+
 /* =====================================================
    DEFAULT EXPORT
 ===================================================== */
