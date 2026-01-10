@@ -1,46 +1,39 @@
-# backend/routers/donations.py
-
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, BackgroundTasks, Depends
 import os
 import razorpay
 import logging
 from datetime import datetime
 from uuid import uuid4
-from typing import List, Optional
 
-from models import Donation, DonationCreate
+from models import DonationCreate
+from db import get_db
 from auth import get_current_user
-from db import get_db   # ✅ safe lazy DB loader
+from utils.email import send_email
 
 router = APIRouter(prefix="/donations", tags=["Donations"])
 
-# ================== Logging ==================
 logger = logging.getLogger("donations")
 logger.setLevel(logging.INFO)
 
-# ================== HEALTH ==================
 
 @router.get("/health")
 async def health_check():
     return {"status": "donations router OK"}
 
-# ======================================================
-# CREATE RAZORPAY ORDER (PUBLIC)
-# ======================================================
-@router.post("/create-order", status_code=status.HTTP_201_CREATED)
-async def create_razorpay_order(donation: DonationCreate):
-    """
-    Create Razorpay order and store donation in DB
-    """
 
+# ================================
+# CREATE DONATION + EMAIL
+# ================================
+@router.post("/create-order", status_code=status.HTTP_201_CREATED)
+async def create_razorpay_order(
+    donation: DonationCreate,
+    background_tasks: BackgroundTasks
+):
     RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
     RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-        raise HTTPException(
-            status_code=503,
-            detail="Payment gateway not configured"
-        )
+        raise HTTPException(status_code=503, detail="Payment gateway not configured")
 
     razorpay_client = razorpay.Client(
         auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
@@ -61,106 +54,73 @@ async def create_razorpay_order(donation: DonationCreate):
     }
 
     try:
-        # Save donation first
         await db.donations.insert_one(donation_doc)
-        logger.info(f"Donation created: {donation_id}")
 
-        # Razorpay expects paise
-        amount_paise = int(donation.amount * 100)
-
-        razorpay_order = razorpay_client.order.create({
-            "amount": amount_paise,
+        order = razorpay_client.order.create({
+            "amount": int(donation.amount * 100),
             "currency": "INR",
             "receipt": donation_id,
             "payment_capture": 1,
-            "notes": {
-                "donation_id": donation_id,
-                "donor_name": donation.name,
-                "donor_email": donation.email,
-                "donor_phone": donation.phone,
-                "donation_type": donation.type,
-            }
         })
 
         await db.donations.update_one(
             {"id": donation_id},
-            {"$set": {"razorpay_order_id": razorpay_order["id"]}}
+            {"$set": {"razorpay_order_id": order["id"]}}
+        )
+
+        # ================= EMAILS =================
+        background_tasks.add_task(
+            send_email,
+            donation.email,
+            "Thank you for supporting RIDS ❤️",
+            f"""
+Dear {donation.name},
+
+Thank you for your generous donation of ₹{donation.amount}.
+Your support helps us serve communities in need.
+
+Donation ID: {donation_id}
+
+— RIDS Team
+"""
+        )
+
+        background_tasks.add_task(
+            send_email,
+            os.getenv("RIDS_OFFICIAL_EMAIL"),
+            "New Donation Received",
+            f"""
+New donation received:
+
+Name: {donation.name}
+Email: {donation.email}
+Phone: {donation.phone}
+Amount: ₹{donation.amount}
+Type: {donation.type}
+Donation ID: {donation_id}
+"""
         )
 
         return {
-            "status": "created",
-            "order_id": razorpay_order["id"],
+            "order_id": order["id"],
             "donation_id": donation_id,
-            "amount": donation.amount,
-            "amount_paise": razorpay_order["amount"],
-            "currency": razorpay_order["currency"],
             "razorpay_key_id": RAZORPAY_KEY_ID,
         }
 
     except Exception as e:
-        logger.exception("Razorpay order creation failed")
+        logger.exception("Donation failed")
+        raise HTTPException(status_code=500, detail="Donation failed")
 
-        await db.donations.update_one(
-            {"id": donation_id},
-            {"$set": {"status": "failed", "error": str(e)}}
-        )
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create Razorpay order"
-        )
-
-# ======================================================
-# GET ALL DONATIONS (ADMIN ONLY)
-# ======================================================
-@router.get("", response_model=List[Donation])
-async def get_donations(
-    status_filter: Optional[str] = None,
-    limit: int = 100,
-    current_user: dict = Depends(get_current_user),
-):
+# ================================
+# GET DONATIONS (ADMIN)
+# ================================
+@router.get("", dependencies=[Depends(get_current_user)])
+async def get_donations():
     db = get_db()
-
-    query = {}
-    if status_filter:
-        query["status"] = status_filter
-
-    donations = (
-        await db.donations
-        .find(query)
-        .sort("created_at", -1)
-        .to_list(limit)
-    )
+    donations = await db.donations.find({}).sort("created_at", -1).to_list(1000)
 
     for d in donations:
         d.pop("_id", None)
 
-    return [Donation(**d) for d in donations]
-
-# ======================================================
-# UPDATE DONATION STATUS (ADMIN)
-# ======================================================
-@router.put("/{donation_id}/status")
-async def update_donation_status(
-    donation_id: str,
-    status: str,
-    current_user: dict = Depends(get_current_user),
-):
-    valid_statuses = ["pending", "completed", "failed"]
-    if status not in valid_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Status must be one of {valid_statuses}",
-        )
-
-    db = get_db()
-
-    result = await db.donations.update_one(
-        {"id": donation_id},
-        {"$set": {"status": status}},
-    )
-
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Donation not found")
-
-    return {"message": "Donation status updated"}
+    return donations
