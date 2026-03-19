@@ -7,9 +7,9 @@ import { ngoInfo, impactStats, teamMembers } from '../data/mock';
 
 const About = () => {
   const milestones = [
-    { year: '1998', title: 'Foundation', description: 'RIDS established in Banswara, Rajasthan' },
-    { year: '2003', title: 'First Major Program', description: 'Launched women self-help group initiative' },
-    { year: '2008', title: 'Expansion', description: 'Extended operations to 50+ villages' },
+    { year: '2007', title: 'Foundation', description: 'RIDS established in Banswara, Rajasthan' },
+    { year: '2008', title: 'First Major Program', description: 'Launched women self-help group initiative' },
+    { year: '2010', title: 'Expansion', description: 'Extended operations to 50+ villages' },
     { year: '2015', title: 'Healthcare Initiative', description: 'Started mobile health clinic program' },
     { year: '2020', title: 'Education Milestone', description: 'Supported 10,000+ students' },
     { year: '2025', title: 'Continuing Growth', description: '27 years of dedicated service' },
