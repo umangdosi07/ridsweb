@@ -222,7 +222,7 @@ export const volunteerOpportunities = [
 
 export const teamMembers = [
   {
-    name: "Ketan Dosi",
+    name: "K. A. Dosi",
     role: "Chief Functionary",
     message: "For over two decades, RIDS has been committed to transforming lives in rural Rajasthan. Our mission is simple - empower communities to build a better future for themselves."
   }
